@@ -38,25 +38,24 @@ class Block {
     validate() {
         let self = this;
         return new Promise((resolve, reject) => {
-            // Save in auxiliary variable the current block hash
-            const current_hash = self.hash; // save the variable of the hash of self (self.hash) into a temporary variable
-            self.hash = null;  //set to nll
-       
-            // Recalculate the hash of the Block
-            var newobj = JSON.stringify(self);          
-            const new_hash = SHA256(newobj); // generate the harsh of the block
-             
-            // Comparing if the hashes changed
-            self.hash = current_hash; // pass the hash created previously with is the hash of original self to original self hash
+            try {
+                // Save in auxiliary variable the current block hash
+                const current_hash = self.hash; // save the variable of the hash of self (self.hash) into a temporary variable
+                self.hash = null;  //set to nll
+        
+                // Recalculate the hash of the Block
+                var newobj = JSON.stringify(self);          
+                const new_hash = SHA256(newobj).toString(); // generate the harsh of the block
+                
+                // Comparing if the hashes changed
+                self.hash = current_hash; // pass the hash created previously with is the hash of original self to original self hash
 
-            self.hash = currentHash
-            // Returning the Block is not valid
-            if(currentHash==newHash){
-                resolve(true)
-            }
-            // Returning the Block is valid
-            else{
-                reject(false)
+                self.hash = currentHash
+
+                // Comparing if the hashes changed and return true or false
+                resolve(currentHash === new_hash);
+            } catch (error) {
+                reject(new Error(error));
             }
         });
     }
@@ -71,28 +70,24 @@ class Block {
      *     or Reject with an error.
      */
     getBData() {
-        let self = this
-        
-        return new Promise((resolve,reject) => {
-        // Getting the encoded data saved in the Block
-        var encoded_body = this.body; // the body is usually encoded
-        
-        // Decoding the data to retrieve the JSON representation of the object
-        var decoded_body = hex2ascii(encoded_body) // retrieve decoded JSOn representation of the date
+            let self = this
+            
+            return new Promise((resolve,reject) => {
+            // Getting the encoded data saved in the Block
+            var encoded_body = this.body; // the body is usually encoded
+            
+            // Decoding the data to retrieve the JSON representation of the object
+            var decoded_body = hex2ascii(encoded_body) // retrieve decoded JSOn representation of the date
 
-        // Parse the data to an object to be retrieve.
-        var parsed_obj = JSON.parse(decoded_body);
+            // Parse the data to an object to be retrieve.
+            var parsed_obj = JSON.parse(decoded_body);
 
-        // Resolve with the data if the object isn't the Genesis block
-        if(decoded_body != 'Genesis Block')
-        { 
-            resolve(obj);
-        }
-        else
-        {
-            reject('This is a genesis block')
-        }
-
+            // Resolve with the data if the object isn't the Genesis block
+            if(this.height == 0){
+                reject('This is a Genesis block')
+            }else{
+                resolve(parsed_obj)
+            }
         });       
     }
 

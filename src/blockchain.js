@@ -62,9 +62,25 @@ class Blockchain {
      * that this method is a private method. 
      */
     _addBlock(block) {
-        let self = this;
+        let self = this;  // store reference of original class
         return new Promise(async (resolve, reject) => {
-           
+            
+            block.height = self.chain.length; //get current chain height
+            block.time = new Date().getTime().toString().slice(0,-3); //get current time
+            if(self.chain.length > 0){
+                block.previousBlockHash = self.chain[self.chain.length-1].hash; //get and assign previous block hash
+            }
+            block.hash = SHA256(JSON.stringify(block)).toString(); //calculate hash
+            //Validation
+            let errors = await self.validateChain(); //call the validate chain method and get any errors
+            console.log(errors)
+            if (errors.length === 0 ){ //if no errors in blockchain
+                self.chain.push(block); //push new block
+                self.height++; //// update current heigh of block by 1 cos a new block is added 
+                resolve(block) //resolve the new block
+            }else{
+                reject(errors);
+            }
         });
     }
 
@@ -78,7 +94,8 @@ class Blockchain {
      */
     requestMessageOwnershipVerification(address) {
         return new Promise((resolve) => {
-            
+            const message = `${address}:${new Date().getTime().toString().slice(0, -3)}:starRegistry`; //construct the message as explained, with the address + time + starRegistry
+            resolve(message);   
         });
     }
 
@@ -99,12 +116,51 @@ class Blockchain {
      * @param {*} signature 
      * @param {*} star 
      */
-    submitStar(address, message, signature, star) {
+
+     submitStar(address, message, signature, star) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-            
+            let time = parseInt(message.split(':')[1]);
+            let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
+            if((time + (5*60*1000)) >= currentTime){
+                // verify the signature
+                let isValid = bitcoinMessage.verify(message, address, signature);
+                if(isValid){
+                    let block = new BlockClass.Block({data: star, owner: address});
+                    let addedBlock = await self._addBlock(block);
+                    resolve(addedBlock);
+                } else {
+                    reject('Your signature is not valid');
+                }
+            } else {
+                reject('You should submit the star before 5 minutes');
+            }
         });
     }
+    // submitStar(address, message, signature, star) {
+    //     let self = this;
+    //     return new Promise(async (resolve, reject) => {
+    //         let msg_time = parseInt(message.split(':')[1]); //Get the time component value from the message sent as a parameter (line 96)
+    //         let currentTime = parseInt(new Date().getTime().toString().slice(0, -3)); //Get the current time
+    //         if (currentTime - msg_time < (5*60))
+    //         { //Check if the time elapsed since when the message was sent to the current time is less than 5 minutes
+    //             if(bitcoinMessage.verify(message, address, signature)) 
+    //             {  //If yes verify the message
+    //                 let block = new BlockClass.Block({"owner":address, "star":star});  //creation of the new block with the owner and the star 
+    //                 self._addBlock(block);                                            //Add the block
+    //                 resolve(block);                                                   //Resolve with the new block
+    //             }
+    //             else
+    //             {
+    //                 reject(Error('Message is not verified'))                          //Error message
+    //             }
+    //         }
+    //         else
+    //         {
+    //             reject(Error('too much time has passed, stay below 5 minutes'))       //Error message
+    //         }
+    //     });
+    // }
 
     /**
      * This method will return a Promise that will resolve with the Block
@@ -115,7 +171,14 @@ class Blockchain {
     getBlockByHash(hash) {
         let self = this;
         return new Promise((resolve, reject) => {
-           
+           var block = self.chain.filter(block => block.hash === hash); // get block of the same value and type of the block that belong to the hash parameter
+
+           // check if the block is valid
+           if(typeof block == 'undefined'){
+                reject(Error('Block was not found'));
+           }else{
+               resolve(block);
+           }
         });
     }
 
@@ -146,7 +209,21 @@ class Blockchain {
         let self = this;
         let stars = [];
         return new Promise((resolve, reject) => {
+            self.chain.forEach(async(b)=> {        //loop on the blocks present in the chain
+                let data = await b.getBData();        //get decoded block data for each block
+                if(data){
+                    if(data.owner === address){       //check if owner of the star address is the same address passed in param
+                      stars.push(data);               //if yes, add star's data to stars array
+                    }
+                }
+            })
             
+            if (stars.some((x) => x % 2 === 0)){        // if stars.Any()
+                resolve(stars);                            //return array of stars             
+            }else{
+                reject(Error(`Collection of stars was not found for ${address}`));
+            }   
+
         });
     }
 
@@ -158,9 +235,37 @@ class Blockchain {
      */
     validateChain() {
         let self = this;
-        let errorLog = [];
+        let errors = [];
         return new Promise(async (resolve, reject) => {
-            
+            // loop through all blocks and ensure that the  hash value of previous block stored on current 
+            //block is the same as the actual hash of previous block 
+            let promises = [];
+            self.chain.forEach((block, i) => {
+                if (block.height > 0) {
+                    const prev_block = self.chain[index - 1];
+                    if (block.previousBlockHash !== prev_block.hash) {
+                        const error_message = `Block ${i} previousBlockHash set to ${block.previousBlockHash}, but actual previous block hash was ${prev_block.hash}`;
+                        errors.push(error_message);
+                    }
+                }
+
+                // Store promise to validate each block
+                promises.push(block.validate());
+            });
+
+            // Collect results of each block's validate call
+            Promise.all(promises)
+            .then(validated_blocks => {
+                validated_blocks.forEach((valid, i) => {
+                    if (!valid) {
+                        const invalid_block = self.chain[i];
+                        const err_Msg = `Block ${i} hash (${invalid_block.hash}) is invalid`;
+                        errors.push(err_Msg);
+                    }
+                });
+
+                resolve(errors);
+            });
         });
     }
 
