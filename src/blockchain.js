@@ -117,50 +117,30 @@ class Blockchain {
      * @param {*} star 
      */
 
-     submitStar(address, message, signature, star) {
+    submitStar(address, message, signature, star) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-            let time = parseInt(message.split(':')[1]);
-            let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
-            if((time + (5*60*1000)) >= currentTime){
-                // verify the signature
-                let isValid = bitcoinMessage.verify(message, address, signature);
-                if(isValid){
-                    let block = new BlockClass.Block({data: star, owner: address});
-                    let addedBlock = await self._addBlock(block);
-                    resolve(addedBlock);
-                } else {
-                    reject('Your signature is not valid');
+            let msg_time = parseInt(message.split(':')[1]); //Get the time component value from the message sent as a parameter (line 96)
+            let currentTime = parseInt(new Date().getTime().toString().slice(0, -3)); //Get the current time
+            if (currentTime - msg_time < (5*60))
+            { //Check if the time elapsed since when the message was sent to the current time is less than 5 minutes
+                if(bitcoinMessage.verify(message, address, signature)) 
+                {  //If yes verify the message
+                    let block = new BlockClass.Block({"owner":address, "star":star});  //creation of the new block with the owner and the star 
+                    self._addBlock(block);                                            //Add the block
+                    resolve(block);                                                   //Resolve with the new block
                 }
-            } else {
-                reject('You should submit the star before 5 minutes');
+                else
+                {
+                    reject(Error('Message was not verified'))                          //Error message
+                }
+            }
+            else
+            {
+                reject(Error('The time has passed 5 minutes'))       //Error message
             }
         });
     }
-    // submitStar(address, message, signature, star) {
-    //     let self = this;
-    //     return new Promise(async (resolve, reject) => {
-    //         let msg_time = parseInt(message.split(':')[1]); //Get the time component value from the message sent as a parameter (line 96)
-    //         let currentTime = parseInt(new Date().getTime().toString().slice(0, -3)); //Get the current time
-    //         if (currentTime - msg_time < (5*60))
-    //         { //Check if the time elapsed since when the message was sent to the current time is less than 5 minutes
-    //             if(bitcoinMessage.verify(message, address, signature)) 
-    //             {  //If yes verify the message
-    //                 let block = new BlockClass.Block({"owner":address, "star":star});  //creation of the new block with the owner and the star 
-    //                 self._addBlock(block);                                            //Add the block
-    //                 resolve(block);                                                   //Resolve with the new block
-    //             }
-    //             else
-    //             {
-    //                 reject(Error('Message is not verified'))                          //Error message
-    //             }
-    //         }
-    //         else
-    //         {
-    //             reject(Error('too much time has passed, stay below 5 minutes'))       //Error message
-    //         }
-    //     });
-    // }
 
     /**
      * This method will return a Promise that will resolve with the Block
